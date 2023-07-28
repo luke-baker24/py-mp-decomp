@@ -1,0 +1,110 @@
+MOOSTimeWarp = 4
+LatOrigin  = 41.34928
+LongOrigin = -74.063645
+ServerHost = localhost
+ServerPort = 9000
+Community = shoreside
+ProcessConfig = ANTLER
+{
+  MSBetweenLaunches = 100
+  Run = MOOSDB @ NewConsole = false
+  Run = uProcessWatch @ NewConsole = false
+  Run = uFldNodeComms @ NewConsole = false
+  Run = pTimeWatch @ NewConsole = false
+  Run = pHostInfo @ NewConsole = false
+  Run = pShare @ NewConsole = false
+  Run = uFldShoreBroker @ NewConsole = false
+  Run = pMarineViewer @ NewConsole = false
+  Run = uTimerScript @ NewConsole = false
+}
+
+ProcessConfig = uProcessWatch
+{
+  AppTick = 1
+  CommsTick = 1
+  allow_retractions = true
+  watch_all = true
+  nowatch = uXMS*
+  nowatch = uPokeDB*
+  summary_wait = 10
+}
+
+ProcessConfig = uFldNodeComms
+{
+  AppTick = 2
+  CommsTick = 2
+  comms_range = 5000
+  critical_range = 25
+  min_msg_interval = 0
+  max_msg_length = 10000
+  groups = false
+  view_node_rpt_pulses = false
+}
+
+ProcessConfig = pTimeWatch
+{
+  AppTick = 4
+  CommsTick = 4
+  comms_range = NODE_REPORT
+  critical_range = 30
+}
+
+ProcessConfig = pHostInfo
+{
+  AppTick = 2
+  CommsTick = 2
+}
+
+ProcessConfig = pMarineViewer
+{
+  AppTick = 4
+  CommsTick = 4
+  set_pan_x = 0
+  set_pan_y = 0
+  zoom = 1
+  vehicles_shape_scale = 1.5
+  vehicles_name_mode = names
+  circle_viewable_all = true
+  appcast_viewable = true
+  appcast_color_scheme = indigo
+  TIFF_FILE = popolopen.tif
+  button_one = DEPLOY # DEPLOY = true
+  button_two = PAUSE # DEPLOY = false
+}
+
+ProcessConfig = pShare
+{
+  AppTick = 2
+  CommsTick = 2
+  input = route = localhost:9300
+}
+
+ProcessConfig = uFldShoreBroker
+{
+  AppTick = 1
+  CommsTick = 1
+  bridge = src=HELM_MAP_CLEAR, alias=HELM_MAP_CLEAR
+  bridge = src=MULTI_NOTIFY
+  bridge = src=FOUND_OBJ
+  qbridge = NODE_REPORT
+  qbridge = NODE_MESSAGE
+  qbridge = APPCAST_REQ
+  qbridge = UMFG_HEARTBEAT
+  qbridge = MOB_POSITION_X
+  qbridge = MOB_DETECTED
+  qbridge = DEPLOY
+  qbridge = MOB_BOX_Y
+  qbridge = MOB_BOX_X
+  qbridge = MOB_POSITION_Y
+}
+
+ProcessConfig = uTimerScript
+{
+  AppTick = 4
+  CommsTick = 4
+
+  condition = MOB_DETECTED=1
+
+  event = var=FOUND_OBJ, val=true, time=0, amt=1
+  upon_awake = restart
+}

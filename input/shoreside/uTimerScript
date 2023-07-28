@@ -1,0 +1,10 @@
+ProcessConfig = uTimerScript
+{
+  AppTick = 4
+  CommsTick = 4
+
+  condition = MOB_DETECTED=1
+
+  event = var=FOUND_OBJ, val=true, time=0, amt=1
+  upon_awake = restart
+}
