@@ -14,6 +14,7 @@ class Link:
     def __init__(self, source, destination, guid):
         self.source = source
         self.destination = destination
+        self.text = ""
         self.guid = guid
         self.link_type = LINK_TYPE.UNDEFINED
     

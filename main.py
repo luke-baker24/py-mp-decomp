@@ -1,6 +1,8 @@
 #Standard libraries
 import json
 import os
+import sys
+import stat
 import shutil
 from enum import Enum
 
@@ -41,7 +43,7 @@ def write_processconfig(file, process, variable_value_pairs):
 ################################################################################
 
 #Pulling the traces from the desired input file using above methods
-traces = parse_traces_from_gry("input/v2_NSA_SAR_scope_1.gry")
+traces = parse_traces_from_gry("input/v4_NSA_SAR_scope_1.gry")
 
 #Finding the path for the output directory
 cwd = os.getcwd()
@@ -174,9 +176,9 @@ for trace in traces:
 
                     for link3 in trace.nodes[destination_node].links_in:
                         if trace.nodes[link3.source].name == "MOOSDB":
-                            var_string = trace.nodes[destination_node].name
+                            var_string = trace.nodes[destination_node].name.replace(" ", "_")
 
-                            button_adj_var_string = var_string.replace("  ", " = ")
+                            button_adj_var_string = var_string.replace("__", " = ")
 
                             if button_name not in buttons:
                                 buttons[button_name] = [ button_adj_var_string ]
@@ -220,7 +222,7 @@ for button, button_vars in buttons.items():
     button_vars = [*set(button_vars)]
 
     for button_var in button_vars:
-        button_string += " # " + button_var.replace(" ", "_")
+        button_string += " # " + button_var
 
     pMarineViewerConfig[current_button_name] = [ button_string ]
 
@@ -244,7 +246,6 @@ uFldShoreBrokerConfig = {
     "bridge": [
         "src=HELM_MAP_CLEAR, alias=HELM_MAP_CLEAR",
         "src=MULTI_NOTIFY"
-        #"src=FOUND_OBJ" #removed  cause not needed
     ],
     "qbridge" : [ 
         "NODE_REPORT",
@@ -254,8 +255,6 @@ uFldShoreBrokerConfig = {
     ]
 }
 
-#uhh this code is good but incorrect - not all variables in moosdb should
-#get qbridged, only ones that shoreside posts
 qbridge_list = []
 
 for trace in traces:
@@ -525,8 +524,6 @@ for robot_name in robots:
         ]
     }
 
-    #uhh this code is good but incorrect - not all variables in moosdb should
-    #get qbridged, only ones that shoreside posts
     bridge_list = []
 
     for trace in traces:
@@ -597,7 +594,7 @@ for robot_name in robots:
                 for link in trace.nodes[node].links_out:
                     moos_app = trace.nodes[link.destination].name
 
-                    moos_app = moos_app.split(" ", 1)[1]
+                    moos_app = moos_app[(len(robot_name) + 1):]
 
                     if moos_app != "pHelmIvP":
                         #An additional moos app is found
@@ -606,26 +603,168 @@ for robot_name in robots:
     extra_moos_apps = [*set(extra_moos_apps)]
 
     for moos_app in extra_moos_apps:
-        if os.path.isfile(input_dir + robot_name.lower() + "/" + moos_app):
-            config_file = open(input_dir + robot_name.lower() + "/" + moos_app)
+        print(input_dir + robot_name.replace(" ", "_") + "/" + moos_app)
+        if os.path.isfile(input_dir + robot_name.replace(" ", "_") + "/" + moos_app):
+            config_file = open(input_dir + robot_name.replace(" ", "_") + "/" + moos_app)
 
             robot.write("\n" + config_file.read() + "\n")
 
     robot.close()
 
-exit()
-
 #Part 3: Robot bhv files
 ################################################################################
-for robot in robots:
-    robot = open(robot.name + ".bhv", "x")
 
-    global_trace = Trace("")
+class Mode:
+    def __init__(self, name):
+        self.name = name
+        self.parent_mode = ""
+        self.conditions = []
+        self.condition = {}
 
-    #for trace in traces:
-    #    if trace.
+modes = []
 
-    robot.write("")
+robots = [*set(robots)]
+
+for robot_name in robots:
+    robot = open("output/" + robot_name.replace(" ", "_") + ".bhv", "x")
+
+    initial_variables = {}
+
+    states = []
+
+    #First find the initial values of variables using initialize_moosdb
+    for trace in traces:
+        for node in trace.nodes:
+            if trace.nodes[node].name == "initialize moosdb":
+                for link_out in trace.nodes[node].links_out:
+                    if link_out.link_type == LINK_TYPE.INCLUDES:
+                        init_node = trace.nodes[link_out.destination]
+
+                        init_node_text = init_node.name[4:]
+
+                        variable = init_node_text.split("  ", 1)[0].replace(" ", "_")
+                        value = init_node_text.split("  ", 1)[1].replace(" ", "_")
+
+                        #This variable is hardcoded in so we don't need it in the behavior file
+                        if variable != "MOOS_MANUAL_OVERRIDE":
+                            initial_variables[variable] = value
+
+    for variable, value in initial_variables.items():
+        robot.write("initialize " + variable + " = " + value + "\n")
+    
+    robot.write("\n")
+
+    #Finding the trace with the robot's state machine in it
+    for trace in traces:
+        for parent_node_index in trace.nodes:
+            if trace.nodes[parent_node_index].node_type == NODE_TYPE.GRAPH_PARENT:
+
+
+
+
+
+                global_trace = trace
+                parent_node = trace.nodes[parent_node_index]
+
+                #if parent_node.name == robot_name + " State Diagram":
+                #    pass
+                #    #This will matter in the future but i haven't added support for multiple state machines yet
+
+                undefined_nodes = []
+                defined_modes = []
+                
+
+                for node in trace.nodes:
+                    if trace.nodes[node].node_type == NODE_TYPE.GRAPH_CHILD:
+                        undefined_nodes.append(trace.nodes[node])
+                        #Then the node is part of the state machine
+
+                        current_node = trace.nodes[node]
+
+                        if current_node.name == "ALLSTOP":
+                            #this is some annoying hardcode, ideally in later versions it autodetects the initial node's name
+                            for link_in in current_node.links_in:
+                                transition_text = link_in.text
+
+                                variable = transition_text.split("__", 1)[0]
+                                value = transition_text.split("__", 1)[1]
+
+                                new_mode = Mode("ALLSTOP")
+
+                                new_mode.condition = { variable : value }
+
+                                unique = True
+                                for existing_defined_mode in defined_modes:
+                                    if existing_defined_mode.name == new_mode.name:
+                                        unique = False
+                                    
+                                if unique:
+                                    defined_modes.append(new_mode)
+
+                while len(undefined_nodes) > len(defined_modes):
+                    for undefined_node in undefined_nodes:
+                        for link_in in undefined_node.links_in:
+                            for defined_mode in defined_modes:
+                                if trace.nodes[link_in.source].name == defined_mode.name:
+                                    #Found a defined node
+
+                                    new_mode = Mode(undefined_node.name)
+
+                                    new_mode.conditions = defined_mode.conditions
+
+                                    transition_text = link_in.text
+
+                                    variable = transition_text.split("__", 1)[0]
+                                    value = transition_text.split("__", 1)[1]
+
+                                    new_mode.condition = { variable : value }
+
+                                    if variable in defined_mode.condition:
+                                        #Node is adjacent with defined mode.
+                                        new_mode.parent_mode = defined_mode.parent_mode
+                                    else:
+                                        #Node is child of defined mode.
+                                        if defined_mode.parent_mode == "":
+                                            new_mode.parent_mode = defined_mode.name
+                                        else:
+                                            new_mode.parent_mode = defined_mode.parent_mode + ":" + defined_mode.name
+
+                                    unique = True
+                                    for existing_defined_mode in defined_modes:
+                                        if existing_defined_mode.name == new_mode.name:
+                                            unique = False
+                                    
+                                    if unique:
+                                        defined_modes.append(new_mode)
+                
+                for defined_mode in defined_modes:
+                    robot.write("set MODE = " + defined_mode.name + "{\n")
+
+                    for variable, value in defined_mode.condition.items():
+                        robot.write("  " + variable + " = " + value + "\n")
+                    
+                    if defined_mode.parent_mode != "":
+                        robot.write("  MODE = " + defined_mode.parent_mode + "\n")
+
+                    robot.write("}\n\n")
+
+                for defined_mode in defined_modes:
+                    print(input_dir + robot_name.replace(" ", "_") + "/" + defined_mode.name)
+                    if os.path.exists(input_dir + robot_name.replace(" ", "_") + "/" + defined_mode.name):
+                        mode_behaviors = open(input_dir + robot_name.replace(" ", "_") + "/" + defined_mode.name, "r")
+
+                        lines = mode_behaviors.readlines()
+
+                        for line in lines:
+                            if "condition" in line and "=" in line:
+                                if defined_mode.parent_mode == "":
+                                    robot.write("  condition = MODE==" + defined_mode.name + "\n")
+                                else:
+                                    robot.write("  condition = MODE==" + defined_mode.parent_mode + ":" + defined_mode.name +"\n")
+                            else:
+                                robot.write(line)
+
+                        robot.write("\n\n")
     
     robot.close()
 
@@ -633,9 +772,14 @@ for robot in robots:
 ################################################################################
 
 #Create launch.sh file
+launch = open("output/launch.sh", "w")
+
+launch.write("pAntler shoreside.moos &\n")
+
+for robot_name in robots:
+    launch.write("pAntler " + robot_name.replace(" ", "_") + ".moos &\n")
+
+#Make the launch file executable
+os.chmod(output_dir + "launch.sh", stat.S_IRWXU)
 
 #clean.sh
-
-#popolopen.tif
-
-#popolopen.info

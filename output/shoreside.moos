@@ -85,9 +85,8 @@ ProcessConfig = uFldShoreBroker
   CommsTick = 1
   bridge = src=HELM_MAP_CLEAR, alias=HELM_MAP_CLEAR
   bridge = src=MULTI_NOTIFY
-  bridge = src=FOUND_OBJ
-  bridge = src=MOOS_MANUAL_OVERRIDE
   bridge = src=DEPLOY
+  bridge = src=MOOS_MANUAL_OVERRIDE
   qbridge = NODE_REPORT
   qbridge = NODE_MESSAGE
   qbridge = APPCAST_REQ

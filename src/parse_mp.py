@@ -234,7 +234,7 @@ def parse_traces_from_gry(filename):
                 for graph in active_graph["graphs"]:
                     #Handled the same as for a trace
                     for node in graph["nodes"]:
-                        new_node = Node(node["label"], node["id"], NODE_TYPE.UNDEFINED)
+                        new_node = Node(node["label"], node["id"], NODE_TYPE.GRAPH_CHILD)
 
                         new_trace.nodes[new_node.guid] = new_node
                     
@@ -253,8 +253,8 @@ def parse_traces_from_gry(filename):
                                 case _:
                                     new_link.link_type = LINK_TYPE.UNDEFINED
 
-                        if "text" in link:
-                            new_link.text = link["text"]
+                        if "label" in link:
+                            new_link.text = link["label"]
 
                         new_trace.nodes[link["to_id"]].links_in.append(new_link)
                         new_trace.nodes[link["from_id"]].links_out.append(new_link)
@@ -262,6 +262,9 @@ def parse_traces_from_gry(filename):
                         new_trace.links[index] = new_link
 
                         index += 1
+                    
+                    if "title" in graph:
+                        new_trace.nodes["state_machine"] = Node(graph["title"]["text"], "state_machine", NODE_TYPE.GRAPH_PARENT)
             
         all_traces.append(new_trace)
 

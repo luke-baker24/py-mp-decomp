@@ -1,0 +1,8 @@
+Behavior = BHV_StationKeep
+{
+  name         = station-keep         
+  pwt          = 100       
+  condition    = 
+
+  center_activate = true
+}
