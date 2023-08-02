@@ -135,22 +135,22 @@ ProcessConfig = uFldNodeBroker
   BRIDGE = src=APPCAST
   BRIDGE = src=NODE_REPORT_LOCAL, alias=NODE_REPORT
   BRIDGE = src=NODE_MESSAGE_LOCAL, alias=NODE_MESSAGE
-  BRIDGE = src=MOB_BOX_Y
-  BRIDGE = src=MOB_POSITION_Y
   BRIDGE = src=FOUND_OBJ
-  BRIDGE = src=VIEW_MARKER
-  BRIDGE = src=MOB_DETECTED
   BRIDGE = src=MOB_POSITION_X
   BRIDGE = src=MOB_BOX_X
+  BRIDGE = src=MOB_POSITION_Y
+  BRIDGE = src=VIEW_MARKER
+  BRIDGE = src=MOB_BOX_Y
+  BRIDGE = src=MOB_DETECTED
 }
 
-ProcessConfig = pYOLO
+ProcessConfig = pLocationCalculation
 {
   AppTick = 16
   CommsTick = 16
 }
 
-ProcessConfig = pLocationCalculation
+ProcessConfig = pYOLO
 {
   AppTick = 16
   CommsTick = 16

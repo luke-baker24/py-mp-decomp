@@ -618,8 +618,8 @@ class Mode:
     def __init__(self, name):
         self.name = name
         self.parent_mode = ""
-        self.conditions = []
         self.condition = {}
+        self.anticondition = {}
 
 modes = []
 
@@ -658,11 +658,6 @@ for robot_name in robots:
     for trace in traces:
         for parent_node_index in trace.nodes:
             if trace.nodes[parent_node_index].node_type == NODE_TYPE.GRAPH_PARENT:
-
-
-
-
-
                 global_trace = trace
                 parent_node = trace.nodes[parent_node_index]
 
@@ -672,8 +667,8 @@ for robot_name in robots:
 
                 undefined_nodes = []
                 defined_modes = []
+                defined_mode_names = []
                 
-
                 for node in trace.nodes:
                     if trace.nodes[node].node_type == NODE_TYPE.GRAPH_CHILD:
                         undefined_nodes.append(trace.nodes[node])
@@ -700,51 +695,55 @@ for robot_name in robots:
                                     
                                 if unique:
                                     defined_modes.append(new_mode)
+                                    defined_mode_names.append(new_mode.name)
 
                 while len(undefined_nodes) > len(defined_modes):
                     for undefined_node in undefined_nodes:
+                        if undefined_node.name in defined_mode_names:
+                            continue
+
                         for link_in in undefined_node.links_in:
-                            for defined_mode in defined_modes:
-                                if trace.nodes[link_in.source].name == defined_mode.name:
-                                    #Found a defined node
+                            if trace.nodes[link_in.source].name in defined_mode_names:
+                                for defined_mode in defined_modes:
+                                    if defined_mode.name == trace.nodes[link_in.source].name:
+                                        #Found a defined node
+                                        new_mode = Mode(undefined_node.name)
 
-                                    new_mode = Mode(undefined_node.name)
-
-                                    new_mode.conditions = defined_mode.conditions
-
-                                    transition_text = link_in.text
-
-                                    variable = transition_text.split("__", 1)[0]
-                                    value = transition_text.split("__", 1)[1]
-
-                                    new_mode.condition = { variable : value }
-
-                                    if variable in defined_mode.condition:
-                                        #Node is adjacent with defined mode.
-                                        new_mode.parent_mode = defined_mode.parent_mode
-                                    else:
-                                        #Node is child of defined mode.
-                                        if defined_mode.parent_mode == "":
-                                            new_mode.parent_mode = defined_mode.name
+                                        print(new_mode.name)
+                                        
+                                        transition_text = link_in.text
+                                        
+                                        variable = transition_text.split("__", 1)[0]
+                                        value = transition_text.split("__", 1)[1]
+                                        
+                                        if variable in defined_mode.condition:
+                                            #Node is adjacent with defined mode.
+                                            new_mode.parent_mode = defined_mode.parent_mode
+                                            new_mode.condition[variable] = value
                                         else:
-                                            new_mode.parent_mode = defined_mode.parent_mode + ":" + defined_mode.name
+                                            #Node is child of defined mode.
+                                            new_mode.condition[variable] = value
+                                            defined_mode.anticondition = { variable : value }
 
-                                    unique = True
-                                    for existing_defined_mode in defined_modes:
-                                        if existing_defined_mode.name == new_mode.name:
-                                            unique = False
-                                    
-                                    if unique:
-                                        defined_modes.append(new_mode)
+                                            if defined_mode.parent_mode == "":
+                                                new_mode.parent_mode = defined_mode.name
+                                            else:
+                                                new_mode.parent_mode = defined_mode.parent_mode + ":" + defined_mode.name
+                                
+                                defined_modes.append(new_mode)
+                                defined_mode_names.append(new_mode.name)
+
                 
                 for defined_mode in defined_modes:
                     robot.write("set MODE = " + defined_mode.name + "{\n")
 
                     for variable, value in defined_mode.condition.items():
                         robot.write("  " + variable + " = " + value + "\n")
+                    for variable, value in defined_mode.anticondition.items():
+                        robot.write("  " + variable + " != " + value + "\n")
                     
-                    if defined_mode.parent_mode != "":
-                        robot.write("  MODE = " + defined_mode.parent_mode + "\n")
+                    #if defined_mode.parent_mode != "":
+                    #    robot.write("  MODE = " + defined_mode.parent_mode + "\n")
 
                     robot.write("}\n\n")
 
@@ -757,10 +756,7 @@ for robot_name in robots:
 
                         for line in lines:
                             if "condition" in line and "=" in line:
-                                if defined_mode.parent_mode == "":
-                                    robot.write("  condition = MODE==" + defined_mode.name + "\n")
-                                else:
-                                    robot.write("  condition = MODE==" + defined_mode.parent_mode + ":" + defined_mode.name +"\n")
+                                robot.write("  condition = MODE==" + defined_mode.name + "\n")
                             else:
                                 robot.write(line)
 
@@ -781,5 +777,3 @@ for robot_name in robots:
 
 #Make the launch file executable
 os.chmod(output_dir + "launch.sh", stat.S_IRWXU)
-
-#clean.sh
