@@ -5,11 +5,11 @@ import shutil
 from enum import Enum
 
 #Other files
-from node import Node
-from node import NODE_TYPE
-from link import Link
-from link import LINK_TYPE
-from trace import Trace
+from src.node import Node
+from src.node import NODE_TYPE
+from src.link import Link
+from src.link import LINK_TYPE
+from src.trace import Trace
 
 #Parsing traces from a .wng file. 
 def parse_traces_from_wng(filename):
@@ -130,6 +130,16 @@ def parse_traces_from_wng(filename):
 
             #Creating a new link based on the source and target node found (the pair will always be found)
             new_link = Link(source_node, target_node, link_guid)
+
+            raw_link_type = link_string["relation"]
+
+            match raw_link_type:
+                case "FOLLOWS":
+                    new_link.link_type = LINK_TYPE.PRECEDES
+                case "IN":
+                    new_link.link_type = LINK_TYPE.INCLUDES
+                case _:
+                    new_link.link_type = LINK_TYPE.UNDEFINED
             
             if "text" in link_string:
                 new_link.text = link_string["text"]
@@ -195,6 +205,17 @@ def parse_traces_from_gry(filename):
             for link in active_graph["trace"]["edges"]:
                 new_link = Link(link["from_id"], link["to_id"], index)
 
+                if "relation" in link:
+                    raw_link_type = link["relation"]
+
+                    match raw_link_type:
+                        case "FOLLOWS":
+                            new_link.link_type = LINK_TYPE.PRECEDES
+                        case "IN":
+                            new_link.link_type = LINK_TYPE.INCLUDES
+                        case _:
+                            new_link.link_type = LINK_TYPE.UNDEFINED
+
                 if "text" in link:
                     new_link.text = link["text"]
 
@@ -220,6 +241,17 @@ def parse_traces_from_gry(filename):
                     index = 0
                     for link in graph["edges"]:
                         new_link = Link(link["from_id"], link["to_id"], index)
+
+                        if "relation" in link:
+                            raw_link_type = link["relation"]
+
+                            match raw_link_type:
+                                case "FOLLOWS":
+                                    new_link.link_type = LINK_TYPE.PRECEDES
+                                case "IN":
+                                    new_link.link_type = LINK_TYPE.INCLUDES
+                                case _:
+                                    new_link.link_type = LINK_TYPE.UNDEFINED
 
                         if "text" in link:
                             new_link.text = link["text"]

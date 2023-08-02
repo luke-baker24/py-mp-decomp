@@ -5,14 +5,14 @@ import shutil
 from enum import Enum
 
 #Other files
-from node import Node
-from node import NODE_TYPE
-from link import Link
-from link import LINK_TYPE
-from trace import Trace
+from src.node import Node
+from src.node import NODE_TYPE
+from src.link import Link
+from src.link import LINK_TYPE
+from src.trace import Trace
 
-from parse_mp import parse_traces_from_gry
-from parse_mp import parse_traces_from_wng
+from src.parse_mp import parse_traces_from_gry
+from src.parse_mp import parse_traces_from_wng
 
 ################################################################################
 #Creating MOOS files
@@ -41,7 +41,7 @@ def write_processconfig(file, process, variable_value_pairs):
 ################################################################################
 
 #Pulling the traces from the desired input file using above methods
-traces = parse_traces_from_gry("input/NSA_SAR_scope_1.gry")
+traces = parse_traces_from_gry("input/v2_NSA_SAR_scope_1.gry")
 
 #Finding the path for the output directory
 cwd = os.getcwd()
@@ -136,8 +136,8 @@ write_processconfig(shoreside, "pTimeWatch", {
     "AppTick" : [ "4" ],
     "CommsTick" : [ "4" ],
 
-    "comms_range" : [ "NODE_REPORT" ],
-    "critical_range" : [ "30" ]
+    "watch_var" : [ "NODE_REPORT" ],
+    "threshhold" : [ "30" ]
 })
 
 #Create pHostInfo processconfig
@@ -220,7 +220,7 @@ for button, button_vars in buttons.items():
     button_vars = [*set(button_vars)]
 
     for button_var in button_vars:
-        button_string += " # " + button_var
+        button_string += " # " + button_var.replace(" ", "_")
 
     pMarineViewerConfig[current_button_name] = [ button_string ]
 
@@ -243,13 +243,12 @@ uFldShoreBrokerConfig = {
     "CommsTick" : [ "1" ],
     "bridge": [
         "src=HELM_MAP_CLEAR, alias=HELM_MAP_CLEAR",
-        "src=MULTI_NOTIFY",
-        "src=FOUND_OBJ"
+        "src=MULTI_NOTIFY"
+        #"src=FOUND_OBJ" #removed  cause not needed
     ],
     "qbridge" : [ 
         "NODE_REPORT",
         "NODE_MESSAGE",
-        #"MOOS_MANUAL_OVERRIDE", this one should be handled by the model
         "APPCAST_REQ",
         "UMFG_HEARTBEAT"
     ]
@@ -267,30 +266,46 @@ for trace in traces:
 
                 if var_node.name == "initialize moosdb":
                     continue
+                    
+                for link_in in var_node.links_in:
+                    if link_in.link_type == LINK_TYPE.PRECEDES:
+                        prior_node = link_in.source
 
-                var_name = var_node.name.split("  ", 1)[0]
+                        for link_in2 in trace.nodes[prior_node].links_in:
+                            if link_in2.link_type == LINK_TYPE.INCLUDES:
+                                prior_node2 = trace.nodes[link_in2.source]
 
-                if var_name.startswith("set "):
-                    var_name = var_name.split(" ", 1)[1]
+                                if prior_node2.name == "MOOSDB":
+                                    continue
 
-                if var_name.endswith(" "):
-                    var_name = var_name.replace(" ", "_")
+                                prior_node3 = trace.nodes[prior_node2.links_in[0].source]
 
-                    qbridge_list.append(var_name + "X")
-                    qbridge_list.append(var_name + "Y")
-                else:
-                    var_name = var_name.replace(" ", "_")
+                                print(prior_node3.name)
 
-                    qbridge_list.append(var_name)
+                                if prior_node3.name == "SHORESIDE":
+                                    var_name = var_node.name.split("  ", 1)[0]
+
+                                    if var_name.startswith("set "):
+                                        var_name = var_name.split(" ", 1)[1]
+
+                                    if var_name.endswith(" "):
+                                        var_name = var_name.replace(" ", "_")
+
+                                        qbridge_list.append("src=" + var_name.replace(" ", "_") + "X")
+                                        qbridge_list.append("src=" + var_name.replace(" ", "_") + "Y")
+                                    else:
+                                        var_name = var_name.replace(" ", "_")
+
+                                        qbridge_list.append("src=" + var_name.replace(" ", "_"))
 
 #Removing any duplicate variable assignments
 qbridge_list = [*set(qbridge_list)]
 
-uFldShoreBrokerConfig["qbridge"] += qbridge_list
+uFldShoreBrokerConfig["bridge"] += qbridge_list
 
 write_processconfig(shoreside, "uFldShoreBroker", uFldShoreBrokerConfig)
 
-#Copy over additional DEFAULT processconfigs
+#Copy over additional processconfigs
 extra_moos_apps = []
 
 for trace in traces:
@@ -315,8 +330,6 @@ for moos_app in extra_moos_apps:
 
 shoreside.close()
 
-exit()
-
 #Part 2: Robot moos files
 ################################################################################
 
@@ -326,34 +339,291 @@ for trace in traces:
         node_obj = trace.nodes[node]
         if node_obj.node_type == NODE_TYPE.ROOT:
             if node_obj.name != "MOOSDB" and node_obj.name != "SHORESIDE" and node_obj.name != "EXTERNAL TO MOOS":
-                robots.append(node_obj)
+                robots.append(node_obj.name)
 
-for robot in robots:
-    robot = open(robot.name + ".moos", "x")
+robots = [*set(robots)]
 
-    #Copy over basic variables
-    robot.write("")
+index = 1
+for robot_name in robots:
+    robot = open("output/" + robot_name.replace(" ", "_") + ".moos", "x")
+
+    robot_ip = "localhost"
+    robot_port_affix = str(10 + index)
+
+    #Copy over config variables
+    robot.write("MOOSTimeWarp = " + timewarp + "\n")
+    robot.write("LatOrigin  = 41.34928" + "\n")
+    robot.write("LongOrigin = -74.063645" + "\n")
 
     #Copy over community variables
+    robot.write("ServerHost = " + robot_ip + "\n")
+    robot.write("ServerPort = 90" + robot_port_affix + "\n")
+    robot.write("Community = " + robot_name.replace(" ", "_"))
 
     #Create ANTLER processconfig
+    write_processconfig(robot, "ANTLER", {
+        "MSBetweenLaunches" : [ "100" ],
+        "Run" : [
+            "MOOSDB @ NewConsole = false",
+
+            "uProcessWatch @ NewConsole = false",
+            "pMarinePID @ NewConsole = false",
+            "pHostInfo @ NewConsole = false",
+            "uFldMessageHandler @ NewConsole = false",
+            "pNodeReportParse @ NewConsole = false",
+            "pNodeReporter @ NewConsole = false",
+            "pHelmIvP @ NewConsole = false",
+
+            "pShare @ NewConsole = false",
+            "uFldNodeBroker @ NewConsole = false",
+
+            #"pYOLO @ NewConsole = false",
+            #"pLocationCalculation @ NewConsole = false",
+
+            #"iM1_8 @ NewConsole = false"
+            "uSimMarine @ NewConsole = false"
+        ]
+    })
 
     #Create fully default processconfigs
+    write_processconfig(robot, "pMarinePID", {
+        "AppTick" : [ "10" ],
+        "CommsTick" : [ "10" ],
 
-    #Create either iM18 or uSimMarine processconfig
+        "VERBOSE" : [ "true" ],
+        "DEPTH_CONTROl" : [ "false" ],
+        "ACTIVE_START" : [ "true" ],
+
+        "YAW_PID_KP" : [ "0.35" ],
+        "YAW_PID_KD" : [ "0.07" ],
+        "YAW_PID_KI" : [ "0.0" ],
+        "YAW_PID_INTEGRAL_LIMIT" : [ "0.07" ],
+
+        "SPEED_PID_KP" : [ "1.0" ],
+        "SPEED_PID_KD" : [ "0.0" ],
+        "SPEED_PID_KI" : [ "0.0" ],
+        "SPEED_PID_INTEGRAL_LIMIT" : [ "0.07" ],
+
+        "MAXRUDDER" : [ "100" ],
+        "MAXTHRUST" : [ "84" ],
+        "deprecated_ok" : [ "true" ]
+    })
+
+    #Create pHostInfo processconfig
+    write_processconfig(robot, "pHostInfo", {
+        "AppTick" : [ "1" ],
+        "CommsTick" : [ "1" ]
+    })
+
+    #Create uFldMessageHandler processconfig
+    write_processconfig(robot, "uFldMessageHandler", {
+        "AppTick" : [ "3" ],
+        "CommsTick" : [ "3" ],
+        "STRICT_ADDRESSING": [ "true" ]
+    })
+
+    #Create uProcessWatch processconfig
+    write_processconfig(robot, "uProcessWatch", {
+        "AppTick" : [ "2" ],
+        "CommsTick" : [ "2" ],
+
+        "ALLOW_RETRACTIONS": [ "true" ],
+
+        "WATCH_ALL" : [ "true" ],
+
+        "NOWATCH" : [ 
+            "uMAC*", 
+            "uXMS*", 
+            "uPokeDB*" 
+        ],
+
+        "WATCH" : [ 
+            "pNodeReporter", 
+            "pMarinePID", 
+            "pHelmIvP", 
+            "pShare" 
+        ],
+
+        "SUMMARY_WAIT" : [ "12" ]
+    })
+
+    #Create pNodeReportParse processconfig
+    write_processconfig(robot, "pNodeReportParse", {
+        "AppTick" : [ "4" ],
+        "CommsTick" : [ "4" ]
+    })
+
+    #Create either iM18 and uSimMarine processconfig
+    write_processconfig(robot, "iM1_8", {
+        "ip_addr" : [ robot_ip ],
+        "port" : [ "8003" ],
+        "comms_type" : [ "client" ],
+
+        "ignore_msg": [ 
+            "$DEBUG, $OIVCQ",
+            "$PSEAD, $PSEAE",
+            "$PSEAG, $PSEAJ",
+            "$PSEAF, $VCGLL",
+            "$PTQM0, $PTQM1",
+            "$PSEAX, $PSEAY"
+        ]
+    })
+
+    write_processconfig(robot, "uSimMarine", {
+        "AppTick" : [ "10" ],
+        "CommsTick" : [ "10" ],
+
+        "START_POS": [ "0.0,0.0,0.0" ],
+        "PREFIX": [ "NAV" ],
+
+        "deprecated_ok": [ "true" ]
+    })
 
     #Create phelmivp processconfig
+    write_processconfig(robot, "pHelmIvP", {
+        "AppTick" : [ "4" ],
+        "CommsTick" : [ "4" ],
 
-    #Copy over additional DEFAULT processconfigs
+        "Behaviors": [ robot_name.replace(" ", "_") + ".bhv" ],
+        "Verbose": [ "false" ],
+        "Domain": [ "course:0:359:360", "speed:0:1.5:26" ]
+    })
 
-    #Copy over additional NON DEFAULT processconfigs
+    #Create pNodeReporter processconfig
+    write_processconfig(robot, "pNodeReporter", {
+        "AppTick" : [ "2" ],
+        "CommsTick" : [ "2" ],
+
+        "platform_type": [ "kayak" ],
+        "platform_color": [ "red" ]
+    })
+
+    #Create pNodeReporter processconfig
+    write_processconfig(robot, "pShare", {
+        "AppTick" : [ "2" ],
+        "CommsTick" : [ "2" ],
+
+        "input" : [ "route = " + robot_ip + ":93" + robot_port_affix ]
+    })
+
+    #Write uFldNodeBroker processconfig
+    uFldNodeBrokerConfig =  {
+        "AppTick" : [ "1" ],
+        "CommsTick" : [ "1" ],
+
+        "TRY_SHORE_HOST": [ "pshare_route=" + shoreside_ip + ":93" + shoreside_port_affix ],
+
+        "BRIDGE" : [ 
+            "src=VIEW_POLYGON", 
+            "src=VIEW_POINT", 
+            "src=VIEW_SEGLIST", 
+            "src=VIEW_CIRCLE", 
+            "src=AVDCOL_MODE", 
+            "src=APPCAST", 
+            "src=NODE_REPORT_LOCAL, alias=NODE_REPORT", 
+            "src=NODE_MESSAGE_LOCAL, alias=NODE_MESSAGE"
+        ]
+    }
+
+    #uhh this code is good but incorrect - not all variables in moosdb should
+    #get qbridged, only ones that shoreside posts
+    bridge_list = []
+
+    for trace in traces:
+        for node in trace.nodes:
+            if trace.nodes[node].name == "MOOSDB":
+                for link_out in trace.nodes[node].links_out:
+                    var_node = trace.nodes[link_out.destination]
+
+                    if var_node.name == "initialize moosdb":
+                        continue
+
+                    for link_in in var_node.links_in:
+                        if link_in.link_type == LINK_TYPE.INCLUDES:
+                            if trace.nodes[link_in.source].name == "initialize moosdb":
+                                continue
+
+                    #warning warning warning
+                    if var_node.name == "DEPLOY  false":
+                        continue
+                    #warning warning warning
+                    #this is only here to fix a bug in one model
+                    #hopefully remove this in future!
+                    
+                    for link_in in var_node.links_in:
+                        if link_in.link_type == LINK_TYPE.PRECEDES:
+                            prior_node = link_in.source
+
+                            for link_in2 in trace.nodes[prior_node].links_in:
+                                if link_in2.link_type == LINK_TYPE.INCLUDES:
+                                    prior_node2 = trace.nodes[link_in2.source]
+
+                                    if prior_node2.name == "MOOSDB":
+                                        continue
+
+                                    prior_node3 = trace.nodes[prior_node2.links_in[0].source]
+
+                                    print(prior_node3.name)
+
+                                    if prior_node3.name == robot_name:
+                                        var_name = var_node.name.split("  ", 1)[0]
+
+                                        if var_name.startswith("set "):
+                                            var_name = var_name.split(" ", 1)[1]
+
+                                        if var_name.endswith(" "):
+                                            var_name = var_name.replace(" ", "_")
+
+                                            bridge_list.append("src=" + var_name + "X")
+                                            bridge_list.append("src=" + var_name + "Y")
+                                        else:
+                                            var_name = var_name.replace(" ", "_")
+
+                                            bridge_list.append("src=" + var_name)
+
+    #Removing any duplicate variable assignments
+    bridge_list = [*set(bridge_list)]
+
+    uFldNodeBrokerConfig["BRIDGE"] += bridge_list
+
+    write_processconfig(robot, "uFldNodeBroker", uFldNodeBrokerConfig)
+
+    #Copy over additional processconfigs
+    extra_moos_apps = []
+
+    for trace in traces:
+        for node in trace.nodes:
+            if trace.nodes[node].name == robot_name:
+                for link in trace.nodes[node].links_out:
+                    moos_app = trace.nodes[link.destination].name
+
+                    moos_app = moos_app.split(" ", 1)[1]
+
+                    if moos_app != "pHelmIvP":
+                        #An additional moos app is found
+                        extra_moos_apps.append(moos_app)
+
+    extra_moos_apps = [*set(extra_moos_apps)]
+
+    for moos_app in extra_moos_apps:
+        if os.path.isfile(input_dir + robot_name.lower() + "/" + moos_app):
+            config_file = open(input_dir + robot_name.lower() + "/" + moos_app)
+
+            robot.write("\n" + config_file.read() + "\n")
 
     robot.close()
+
+exit()
 
 #Part 3: Robot bhv files
 ################################################################################
 for robot in robots:
     robot = open(robot.name + ".bhv", "x")
+
+    global_trace = Trace("")
+
+    #for trace in traces:
+    #    if trace.
 
     robot.write("")
     

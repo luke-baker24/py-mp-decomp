@@ -1,0 +1,5 @@
+ProcessConfig = pLocationCalculation
+{
+  AppTick = 16
+  CommsTick = 16
+}

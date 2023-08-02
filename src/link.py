@@ -15,6 +15,7 @@ class Link:
         self.source = source
         self.destination = destination
         self.guid = guid
+        self.link_type = LINK_TYPE.UNDEFINED
     
     def __str__(self):
         return "\nSource: " + str(self.source) + ", Desination: " + str(self.destination) + ", GUID: " + self.guid

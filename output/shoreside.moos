@@ -45,8 +45,8 @@ ProcessConfig = pTimeWatch
 {
   AppTick = 4
   CommsTick = 4
-  comms_range = NODE_REPORT
-  critical_range = 30
+  watch_var = NODE_REPORT
+  threshhold = 30
 }
 
 ProcessConfig = pHostInfo
@@ -68,7 +68,7 @@ ProcessConfig = pMarineViewer
   appcast_viewable = true
   appcast_color_scheme = indigo
   TIFF_FILE = popolopen.tif
-  button_one = DEPLOY # DEPLOY = true
+  button_one = DEPLOY # MOOS_MANUAL_OVERRIDE = false # DEPLOY = true
   button_two = PAUSE # DEPLOY = false
 }
 
@@ -86,16 +86,12 @@ ProcessConfig = uFldShoreBroker
   bridge = src=HELM_MAP_CLEAR, alias=HELM_MAP_CLEAR
   bridge = src=MULTI_NOTIFY
   bridge = src=FOUND_OBJ
+  bridge = src=MOOS_MANUAL_OVERRIDE
+  bridge = src=DEPLOY
   qbridge = NODE_REPORT
   qbridge = NODE_MESSAGE
   qbridge = APPCAST_REQ
   qbridge = UMFG_HEARTBEAT
-  qbridge = MOB_POSITION_X
-  qbridge = MOB_DETECTED
-  qbridge = DEPLOY
-  qbridge = MOB_BOX_Y
-  qbridge = MOB_BOX_X
-  qbridge = MOB_POSITION_Y
 }
 
 ProcessConfig = uTimerScript
