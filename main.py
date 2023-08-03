@@ -179,32 +179,32 @@ buttons = {}
 
 for trace in traces:
     #For each trace, finding the SHORESIDE_pMarineViewer node
+    pMarineViewerNode = None
 
     #Looking through the nodes to find the correct node
     for node in trace.nodes:
         if trace.nodes[node].name == "SHORESIDE pMarineViewer":
             pMarineViewerNode = node
 
-            #Finding all button nodes
-            for link in trace.nodes[pMarineViewerNode].links_out:
-                #Each match is a unique button
-                target_node = trace.nodes[link.destination]
-                button_name = target_node.name
+    #Finding all button nodes
+    for link in trace.nodes[pMarineViewerNode].links_out:
+        #Each match is a unique button
 
-                for link2 in target_node.links_out:
-                    #Should be the moos variable being updated
-                    destination_node = link2.destination
+        target_node = trace.nodes[link.destination]
+        button_name = target_node.name
 
-                    for link3 in trace.nodes[destination_node].links_in:
-                        if trace.nodes[link3.source].name == "MOOSDB":
-                            var_string = trace.nodes[destination_node].name.replace(" ", "_")
+        for link2 in target_node.links_out:
+            #Should be the moos variable being updated
 
-                            button_adj_var_string = var_string.replace("__", " = ")
-
-                            if button_name not in buttons:
-                                buttons[button_name] = [ button_adj_var_string ]
-                            else:
-                                buttons[button_name].append(button_adj_var_string)             
+            destination_node = link2.destination
+            for link3 in trace.nodes[destination_node].links_in:
+                if trace.nodes[link3.source].name == "MOOSDB":
+                    var_string = trace.nodes[destination_node].name.replace(" ", "_")
+                    button_adj_var_string = var_string.replace("__", " = ")
+                    if button_name not in buttons:
+                        buttons[button_name] = [ button_adj_var_string ]
+                    else:
+                        buttons[button_name].append(button_adj_var_string)             
 
 pMarineViewerConfig = {
     "AppTick" : [ "4" ],
@@ -677,110 +677,108 @@ for robot_name in robots:
     writeline(robot)
 
     #Finding the trace with the robot's state machine in it
+    global_trace = None
+
     for trace in traces:
         for parent_node_index in trace.nodes:
             if trace.nodes[parent_node_index].node_type == NODE_TYPE.GRAPH_PARENT:
                 global_trace = trace
-                parent_node = trace.nodes[parent_node_index]
-
-                #if parent_node.name == robot_name + " State Diagram":
-                #    pass
-                #    #This will matter in the future but i haven't added support for multiple state machines yet
-
-                undefined_nodes = []
-                defined_modes = []
-                defined_mode_names = []
                 
-                for node in trace.nodes:
-                    if trace.nodes[node].node_type == NODE_TYPE.GRAPH_CHILD:
-                        undefined_nodes.append(trace.nodes[node])
-                        #Then the node is part of the state machine
+    parent_node = global_trace.nodes[parent_node_index]
+    
+    #if parent_node.name == robot_name + " State Diagram":
+    #    pass
+    #    #This will matter in the future but i haven't added support for multiple state machines yet
+    
+    undefined_nodes = []
+    defined_modes = []
+    defined_mode_names = []
+    
+    #Finding all of the nodes in the state machine and assigning the allstop node
+    for node in global_trace.nodes:
+        if global_trace.nodes[node].node_type == NODE_TYPE.GRAPH_CHILD:
+            undefined_nodes.append(global_trace.nodes[node])
+            #Then the node is part of the state machine
+            current_node = global_trace.nodes[node]
+            if current_node.name == "ALLSTOP":
+                #this is some annoying hardcode, ideally in later versions it autodetects the initial node's name
+                for link_in in current_node.links_in:
+                    transition_text = link_in.text
 
-                        current_node = trace.nodes[node]
-
-                        if current_node.name == "ALLSTOP":
-                            #this is some annoying hardcode, ideally in later versions it autodetects the initial node's name
-                            for link_in in current_node.links_in:
-                                transition_text = link_in.text
-
-                                variable = transition_text.split("__", 1)[0]
-                                value = transition_text.split("__", 1)[1]
-
-                                new_mode = Mode("ALLSTOP")
-
-                                new_mode.condition = { variable : value }
-
-                                unique = True
-                                for existing_defined_mode in defined_modes:
-                                    if existing_defined_mode.name == new_mode.name:
-                                        unique = False
-                                    
-                                if unique:
-                                    defined_modes.append(new_mode)
-                                    defined_mode_names.append(new_mode.name)
-
-                while len(undefined_nodes) > len(defined_modes):
-                    for undefined_node in undefined_nodes:
-                        if undefined_node.name in defined_mode_names:
-                            continue
-
-                        for link_in in undefined_node.links_in:
-                            if trace.nodes[link_in.source].name in defined_mode_names:
-                                for defined_mode in defined_modes:
-                                    if defined_mode.name == trace.nodes[link_in.source].name:
-                                        #Found a defined node
-                                        new_mode = Mode(undefined_node.name)
-
-                                        transition_text = link_in.text
-                                        
-                                        variable = transition_text.split("__", 1)[0]
-                                        value = transition_text.split("__", 1)[1]
-                                        
-                                        if variable in defined_mode.condition:
-                                            #Node is adjacent with defined mode.
-                                            new_mode.parent_mode = defined_mode.parent_mode
-                                            new_mode.condition[variable] = value
-                                        else:
-                                            #Node is child of defined mode.
-                                            new_mode.condition[variable] = value
-                                            defined_mode.anticondition = { variable : value }
-
-                                            if defined_mode.parent_mode == "":
-                                                new_mode.parent_mode = defined_mode.name
-                                            else:
-                                                new_mode.parent_mode = f"{defined_mode.parent_mode}:{defined_mode.name}"
-                                
-                                defined_modes.append(new_mode)
-                                defined_mode_names.append(new_mode.name)
-
-                
-                for defined_mode in defined_modes:
-                    writeline(robot, f"set MODE = {defined_mode.name}{{")
-
-                    for variable, value in defined_mode.condition.items():
-                        writeline(robot, f"  {variable} = {value}")
-                    for variable, value in defined_mode.anticondition.items():
-                        writeline(robot, f"  {variable} != {value}")
+                    variable = transition_text.split("__", 1)[0]
+                    value = transition_text.split("__", 1)[1]
                     
-                    writeline(robot, "}")
-                    writeline(robot)
-
-                for defined_mode in defined_modes:
-                    behavior_path = jp(robot_path, defined_mode.name)
-
-                    if os.path.exists(behavior_path):
-                        mode_behaviors = open(behavior_path, "r")
-
-                        lines = mode_behaviors.readlines()
-
-                        for line in lines:
-                            if "condition" in line and "=" in line:
-                                writeline(robot, f"  condition = MODE=={defined_mode.name}")
+                    new_mode = Mode("ALLSTOP")
+                    new_mode.condition = { variable : value }
+                    unique = True
+                    for existing_defined_mode in defined_modes:
+                        if existing_defined_mode.name == new_mode.name:
+                            unique = False
+                        
+                    if unique:
+                        defined_modes.append(new_mode)
+                        defined_mode_names.append(new_mode.name)
+        
+    #Finding definitions for all of the modes in the state machine
+    while len(undefined_nodes) > len(defined_modes):
+        for undefined_node in undefined_nodes:
+            if undefined_node.name in defined_mode_names:
+                continue
+            
+            for link_in in undefined_node.links_in:
+                if global_trace.nodes[link_in.source].name in defined_mode_names:
+                    for defined_mode in defined_modes:
+                        if defined_mode.name == global_trace.nodes[link_in.source].name:
+                            #Found a defined node
+                            new_mode = Mode(undefined_node.name)
+                            transition_text = link_in.text
+                            
+                            variable = transition_text.split("__", 1)[0]
+                            value = transition_text.split("__", 1)[1]
+                            
+                            if variable in defined_mode.condition:
+                                #Node is adjacent with defined mode.
+                                new_mode.parent_mode = defined_mode.parent_mode
+                                new_mode.condition[variable] = value
                             else:
-                                robot.write(line)
+                                #Node is child of defined mode.
+                                new_mode.condition[variable] = value
+                                defined_mode.anticondition = { variable : value }
+                                if defined_mode.parent_mode == "":
+                                    new_mode.parent_mode = defined_mode.name
+                                else:
+                                    new_mode.parent_mode = f"{defined_mode.parent_mode}:{defined_mode.name}"
+                    
+                    defined_modes.append(new_mode)
+                    defined_mode_names.append(new_mode.name)
+    
+    #Defining hierarchical modes
+    for defined_mode in defined_modes:
+        writeline(robot, f"set MODE = {defined_mode.name}{{")
+        for variable, value in defined_mode.condition.items():
+            writeline(robot, f"  {variable} = {value}")
+        for variable, value in defined_mode.anticondition.items():
+            writeline(robot, f"  {variable} != {value}")
+        
+        writeline(robot, "}")
+        writeline(robot)
+    
+    #Copying over behaviors from user definitions and substituting in conditions
+    for defined_mode in defined_modes:
+        behavior_path = jp(robot_path, defined_mode.name)
 
-                        writeline(robot)
-                        writeline(robot)
+        if os.path.exists(behavior_path):
+            mode_behaviors = open(behavior_path, "r")
+            lines = mode_behaviors.readlines()
+
+            for line in lines:
+                if "condition" in line and "=" in line:
+                    writeline(robot, f"  condition = MODE=={defined_mode.name}")
+                else:
+                    robot.write(line)
+            
+            writeline(robot)
+            writeline(robot)
     
     robot.close()
 
