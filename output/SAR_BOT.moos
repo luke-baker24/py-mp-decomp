@@ -8,7 +8,6 @@ ProcessConfig = ANTLER
 {
   MSBetweenLaunches = 100
   Run = MOOSDB @ NewConsole = false
-  Run = uProcessWatch @ NewConsole = false
   Run = pMarinePID @ NewConsole = false
   Run = pHostInfo @ NewConsole = false
   Run = uFldMessageHandler @ NewConsole = false
@@ -135,12 +134,11 @@ ProcessConfig = uFldNodeBroker
   BRIDGE = src=APPCAST
   BRIDGE = src=NODE_REPORT_LOCAL, alias=NODE_REPORT
   BRIDGE = src=NODE_MESSAGE_LOCAL, alias=NODE_MESSAGE
-  BRIDGE = src=FOUND_OBJ
   BRIDGE = src=MOB_POSITION_X
-  BRIDGE = src=MOB_BOX_X
-  BRIDGE = src=MOB_POSITION_Y
-  BRIDGE = src=VIEW_MARKER
   BRIDGE = src=MOB_BOX_Y
+  BRIDGE = src=MOB_BOX_X
+  BRIDGE = src=VIEW_MARKER
+  BRIDGE = src=MOB_POSITION_Y
   BRIDGE = src=MOB_DETECTED
 }
 

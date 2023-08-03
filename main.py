@@ -39,16 +39,34 @@ def write_processconfig(file, process, variable_value_pairs):
     #Closing the ProcessConfig
     file.write("}\n")
 
+#Stands for join path, just shorthand
+def jp(path1, path2):
+    return os.path.join(path1, path2)
+
+#Automatically add a newline to the end for readability
+def writeline(file):
+    file.write("\n")
+
+def writeline(file, text):
+    file.write(text + "\n")
+
+#A comment node is defined as a node surrounded by underscores/spaces
+def is_comment_node(node):
+    if node.name[0] == " " and node.name[-1] == " ":
+        return True
+    else:
+        return False
+
 #Part 0: preparing to begin making files
 ################################################################################
 
-#Pulling the traces from the desired input file using above methods
-traces = parse_traces_from_gry("input/v4_NSA_SAR_scope_1.gry")
-
 #Finding the path for the output directory
 cwd = os.getcwd()
-output_dir = os.path.join(cwd, "output/")
-input_dir = os.path.join(cwd, "input/")
+output_dir = jp(cwd, "output/")
+input_dir = jp(cwd, "input/")
+
+#Pulling the traces from the desired input file using above methods
+traces = parse_traces_from_gry(jp(input_dir, "demo-NSA_SAR_scope_2.gry"))
 
 #Removing the output directory if it exists
 if os.path.exists(output_dir):
@@ -67,24 +85,20 @@ tif_name = "popolopen"
 ################################################################################
 
 #Creating the shoreside moos file
-shoreside = open(os.path.join(cwd, "output/shoreside.moos"), "x")
-shoreside.close()
-
-#Opening the file for editing
-shoreside = open(os.path.join(cwd, "output/shoreside.moos"), "a")
+shoreside = open(jp(output_dir, "shoreside.moos"), "x")
 
 #Copy over config variables
-shoreside.write("MOOSTimeWarp = " + timewarp + "\n")
-shoreside.write("LatOrigin  = 41.34928" + "\n")
-shoreside.write("LongOrigin = -74.063645" + "\n")
+writeline(shoreside, "MOOSTimeWarp = " + timewarp)
+writeline(shoreside, "LatOrigin  = 41.34928")
+writeline(shoreside, "LongOrigin = -74.063645")
 
 #Copy over community variables
-shutil.copyfile(input_dir + tif_name + ".tif", "output/" + tif_name + ".tif")
-shutil.copyfile(input_dir + tif_name + ".info", "output/" + tif_name + ".info")
+shutil.copyfile(jp(input_dir, tif_name + ".tif"), jp("output/", tif_name + ".tif"))
+shutil.copyfile(jp(input_dir, tif_name + ".info"), jp("output/", tif_name + ".info"))
 
-shoreside.write("ServerHost = " + shoreside_ip + "\n")
-shoreside.write("ServerPort = 90" + shoreside_port_affix + "\n")
-shoreside.write("Community = shoreside")
+writeline(shoreside, "ServerHost = " + shoreside_ip)
+writeline(shoreside, "ServerPort = 90" + shoreside_port_affix)
+writeline(shoreside, "Community = shoreside")
 
 #Create ANTLER processconfig
 write_processconfig(shoreside, "ANTLER", {
@@ -92,9 +106,9 @@ write_processconfig(shoreside, "ANTLER", {
     "Run" : [
         "MOOSDB @ NewConsole = false",
 
-        "uProcessWatch @ NewConsole = false",
+        #"uProcessWatch @ NewConsole = false",
         "uFldNodeComms @ NewConsole = false",
-        "pTimeWatch @ NewConsole = false",
+        #"pTimeWatch @ NewConsole = false",
         "pHostInfo @ NewConsole = false",
 
         "pShare @ NewConsole = false",
@@ -198,7 +212,7 @@ pMarineViewerConfig = {
     "appcast_viewable" : [ "true" ],
     "appcast_color_scheme" : [ "indigo" ],
 
-    "TIFF_FILE" : [ tif_name + ".tif" ] #Note: eventually make this dynamic
+    "TIFF_FILE" : [ tif_name + ".tif" ]
 }
 
 index = 1
@@ -269,6 +283,9 @@ for trace in traces:
                 for link_in in var_node.links_in:
                     if link_in.link_type == LINK_TYPE.PRECEDES:
                         prior_node = link_in.source
+
+                        if is_comment_node(trace.nodes[prior_node]):
+                            continue
 
                         for link_in2 in trace.nodes[prior_node].links_in:
                             if link_in2.link_type == LINK_TYPE.INCLUDES:
@@ -365,7 +382,7 @@ for robot_name in robots:
         "Run" : [
             "MOOSDB @ NewConsole = false",
 
-            "uProcessWatch @ NewConsole = false",
+            #"uProcessWatch @ NewConsole = false",
             "pMarinePID @ NewConsole = false",
             "pHostInfo @ NewConsole = false",
             "uFldMessageHandler @ NewConsole = false",
@@ -539,17 +556,15 @@ for robot_name in robots:
                         if link_in.link_type == LINK_TYPE.INCLUDES:
                             if trace.nodes[link_in.source].name == "initialize moosdb":
                                 continue
-
-                    #warning warning warning
-                    if var_node.name == "DEPLOY  false":
-                        continue
-                    #warning warning warning
-                    #this is only here to fix a bug in one model
-                    #hopefully remove this in future!
                     
                     for link_in in var_node.links_in:
                         if link_in.link_type == LINK_TYPE.PRECEDES:
                             prior_node = link_in.source
+
+                            if is_comment_node(trace.nodes[prior_node]):
+                                continue
+                            
+                            print(trace.nodes[prior_node])
 
                             for link_in2 in trace.nodes[prior_node].links_in:
                                 if link_in2.link_type == LINK_TYPE.INCLUDES:
@@ -559,8 +574,6 @@ for robot_name in robots:
                                         continue
 
                                     prior_node3 = trace.nodes[prior_node2.links_in[0].source]
-
-                                    print(prior_node3.name)
 
                                     if prior_node3.name == robot_name:
                                         var_name = var_node.name.split("  ", 1)[0]

@@ -4,13 +4,12 @@ LongOrigin = -74.063645
 ServerHost = localhost
 ServerPort = 9000
 Community = shoreside
+
 ProcessConfig = ANTLER
 {
   MSBetweenLaunches = 100
   Run = MOOSDB @ NewConsole = false
-  Run = uProcessWatch @ NewConsole = false
   Run = uFldNodeComms @ NewConsole = false
-  Run = pTimeWatch @ NewConsole = false
   Run = pHostInfo @ NewConsole = false
   Run = pShare @ NewConsole = false
   Run = uFldShoreBroker @ NewConsole = false
@@ -68,8 +67,9 @@ ProcessConfig = pMarineViewer
   appcast_viewable = true
   appcast_color_scheme = indigo
   TIFF_FILE = popolopen.tif
-  button_one = DEPLOY # MOOS_MANUAL_OVERRIDE = false # DEPLOY = true
-  button_two = PAUSE # DEPLOY = false
+  button_one = DEPLOY # DEPLOY = true # MOOS_MANUAL_OVERRIDE = false
+  button_two = VETO # FOUND_OBJ = false
+  button_three = PAUSE # DEPLOY = false
 }
 
 ProcessConfig = pShare
@@ -86,6 +86,7 @@ ProcessConfig = uFldShoreBroker
   bridge = src=HELM_MAP_CLEAR, alias=HELM_MAP_CLEAR
   bridge = src=MULTI_NOTIFY
   bridge = src=MOOS_MANUAL_OVERRIDE
+  bridge = src=FOUND_OBJ
   bridge = src=DEPLOY
   qbridge = NODE_REPORT
   qbridge = NODE_MESSAGE
