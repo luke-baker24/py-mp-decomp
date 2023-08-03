@@ -805,7 +805,7 @@ launch = open("launch_path", "w")
 writeline(launch, "pAntler shoreside.moos &>/dev/null")
 
 for robot_name in robots:
-    writeline(launch, f"pAntler {robot_name.replace(" ", "_")}.moos &>/dev/null")
+    writeline(launch, f"pAntler {robot_name.replace(' ', '_')}.moos &>/dev/null")
 
 #Make the launch file executable
 os.chmod(launch_path, stat.S_IRWXU)
