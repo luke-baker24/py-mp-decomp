@@ -7,14 +7,11 @@ import shutil
 from enum import Enum
 
 #Other files
-from src.node import Node
-from src.node import NODE_TYPE
-from src.link import Link
-from src.link import LINK_TYPE
-from src.trace import Trace
+from src.node import *
+from src.link import *
+from src.trace import *
 
-from src.parse_mp import parse_traces_from_gry
-from src.parse_mp import parse_traces_from_wng
+from src.parse_mp import *
 
 ################################################################################
 #Creating MOOS files
@@ -23,26 +20,6 @@ from src.parse_mp import parse_traces_from_wng
 #Part -1: Helper methods for the process
 ################################################################################
 
-#Helper method to generate a ProcessConfig
-def write_processconfig(file, process, variable_value_pairs):
-    #Creating the header of the ProcessConfig
-    file.write("\nProcessConfig = " + process + "\n")
-    file.write("{\n")
-    
-    #Iterate through each of the variable-value pairs
-    for variable, values in variable_value_pairs.items():
-
-        #Loop used in case of duplicate entries for one variable
-        for value in values:
-            file.write("  " + variable + " = " + value + "\n")
-
-    #Closing the ProcessConfig
-    file.write("}\n")
-
-#Stands for join path, just shorthand
-def jp(path1, path2):
-    return os.path.join(path1, path2)
-
 #Automatically add a newline to the end for readability
 def writeline(file):
     file.write("\n")
@@ -50,12 +27,44 @@ def writeline(file):
 def writeline(file, text):
     file.write(text + "\n")
 
+#Helper method to generate a ProcessConfig
+def write_processconfig(file, process, variable_value_pairs):
+    #Creating the header of the ProcessConfig
+    writeline(file, f"\nProcessConfig = {process}")
+    writeline(file, "{")
+    
+    #Iterate through each of the variable-value pairs
+    for variable, values in variable_value_pairs.items():
+
+        #Loop used in case of duplicate entries for one variable
+        for value in values:
+            writeline(file, f"  {variable} = {value}")
+
+    #Closing the ProcessConfig
+    writeline(file, "}")
+
+#Stands for join path, just shorthand
+def jp(path1, path2):
+    return os.path.join(path1, path2)
+
 #A comment node is defined as a node surrounded by underscores/spaces
 def is_comment_node(node):
     if node.name[0] == " " and node.name[-1] == " ":
         return True
     else:
         return False
+
+#A method to assign the ServerHost, Community, etc variables at the top of a moos file
+def set_header_vars(file, timewarp, lat, lng, ip, port_affix, community):
+    writeline(file, f"MOOSTimeWarp = {timewarp}")
+    writeline(file, f"LatOrigin  = {str(lat)}")
+    writeline(file, f"LongOrigin = {str(lng)}")
+
+    writeline(file)
+
+    writeline(file, f"ServerHost = {shoreside_ip}")
+    writeline(file, f"ServerPort = 90{shoreside_port_affix}")
+    writeline(file, f"Community = {community}")
 
 #Part 0: preparing to begin making files
 ################################################################################
@@ -87,18 +96,12 @@ tif_name = "popolopen"
 #Creating the shoreside moos file
 shoreside = open(jp(output_dir, "shoreside.moos"), "x")
 
-#Copy over config variables
-writeline(shoreside, "MOOSTimeWarp = " + timewarp)
-writeline(shoreside, "LatOrigin  = 41.34928")
-writeline(shoreside, "LongOrigin = -74.063645")
-
 #Copy over community variables
-shutil.copyfile(jp(input_dir, tif_name + ".tif"), jp("output/", tif_name + ".tif"))
-shutil.copyfile(jp(input_dir, tif_name + ".info"), jp("output/", tif_name + ".info"))
+shutil.copyfile(jp(input_dir, f"{tif_name}.tif"), jp("output/", f"{tif_name}.tif"))
+shutil.copyfile(jp(input_dir, f"{tif_name}.info"), jp("output/", f"{tif_name}.info"))
 
-writeline(shoreside, "ServerHost = " + shoreside_ip)
-writeline(shoreside, "ServerPort = 90" + shoreside_port_affix)
-writeline(shoreside, "Community = shoreside")
+#Copy over config variables
+set_header_vars(shoreside, timewarp, 41.34928, -74.063645, shoreside_ip, shoreside_port_affix, "shoreside")
 
 #Create ANTLER processconfig
 write_processconfig(shoreside, "ANTLER", {
@@ -121,6 +124,7 @@ write_processconfig(shoreside, "ANTLER", {
 })
 
 #Create uProcessWatch processconfig
+'''
 write_processconfig(shoreside, "uProcessWatch", {
     "AppTick" : [ "1" ],
     "CommsTick" : [ "1" ],
@@ -133,6 +137,7 @@ write_processconfig(shoreside, "uProcessWatch", {
     ],
     "summary_wait" : [ "10" ]
 })
+'''
 
 #Create uFldNodeComms processconfig
 write_processconfig(shoreside, "uFldNodeComms", {
@@ -148,6 +153,7 @@ write_processconfig(shoreside, "uFldNodeComms", {
 })
 
 #Create pTimeWatch processconfig
+'''
 write_processconfig(shoreside, "pTimeWatch", {
     "AppTick" : [ "4" ],
     "CommsTick" : [ "4" ],
@@ -155,6 +161,7 @@ write_processconfig(shoreside, "pTimeWatch", {
     "watch_var" : [ "NODE_REPORT" ],
     "threshhold" : [ "30" ]
 })
+'''
 
 #Create pHostInfo processconfig
 write_processconfig(shoreside, "pHostInfo", {
@@ -212,7 +219,7 @@ pMarineViewerConfig = {
     "appcast_viewable" : [ "true" ],
     "appcast_color_scheme" : [ "indigo" ],
 
-    "TIFF_FILE" : [ tif_name + ".tif" ]
+    "TIFF_FILE" : [ f"{tif_name}.tif" ]
 }
 
 index = 1
@@ -236,7 +243,7 @@ for button, button_vars in buttons.items():
     button_vars = [*set(button_vars)]
 
     for button_var in button_vars:
-        button_string += " # " + button_var
+        button_string += f" # {button_var}"
 
     pMarineViewerConfig[current_button_name] = [ button_string ]
 
@@ -248,7 +255,7 @@ write_processconfig(shoreside, "pMarineViewer", pMarineViewerConfig)
 write_processconfig(shoreside, "pShare", {
     "AppTick" : [ "2" ],
     "CommsTick" : [ "2" ],
-    "input" : [ "route = " + shoreside_ip + ":93" + shoreside_port_affix ]
+    "input" : [ f"route = {shoreside_ip}:93{shoreside_port_affix}" ]
 })
 
 #uFldShoreBroker process config
@@ -296,23 +303,19 @@ for trace in traces:
 
                                 prior_node3 = trace.nodes[prior_node2.links_in[0].source]
 
-                                print(prior_node3.name)
-
                                 if prior_node3.name == "SHORESIDE":
                                     var_name = var_node.name.split("  ", 1)[0]
 
                                     if var_name.startswith("set "):
                                         var_name = var_name.split(" ", 1)[1]
 
+                                        var_name = var_name.replace(" ", "_")
+
                                     if var_name.endswith(" "):
-                                        var_name = var_name.replace(" ", "_")
-
-                                        qbridge_list.append("src=" + var_name.replace(" ", "_") + "X")
-                                        qbridge_list.append("src=" + var_name.replace(" ", "_") + "Y")
+                                        qbridge_list.append(f"src={var_name}X")
+                                        qbridge_list.append(f"src={var_name}Y")
                                     else:
-                                        var_name = var_name.replace(" ", "_")
-
-                                        qbridge_list.append("src=" + var_name.replace(" ", "_"))
+                                        qbridge_list.append(f"src={var_name}")
 
 #Removing any duplicate variable assignments
 qbridge_list = [*set(qbridge_list)]
@@ -339,10 +342,14 @@ for trace in traces:
 extra_moos_apps = [*set(extra_moos_apps)]
 
 for moos_app in extra_moos_apps:
-    if os.path.isfile(input_dir + "shoreside/" + moos_app):
-        config_file = open(input_dir + "shoreside/" + moos_app)
+    shoreside_path = jp(input_dir, "shoreside/")
+    moos_app_path = jp(shoreside_path, moos_app)
 
-        shoreside.write("\n" + config_file.read() + "\n")
+    if os.path.isfile(moos_app_path):
+        config_file = open(moos_app_path)
+
+        writeline(shoreside)
+        writeline(shoreside, config_file.read())
 
 shoreside.close()
 
@@ -361,20 +368,17 @@ robots = [*set(robots)]
 
 index = 1
 for robot_name in robots:
-    robot = open("output/" + robot_name.replace(" ", "_") + ".moos", "x")
+    robot_name = robot_name.replace(" ", "_")
+
+    robot_path = jp(output_dir, f"{robot_name}.moos")
+
+    robot = open(robot_path, "x")
 
     robot_ip = "localhost"
     robot_port_affix = str(10 + index)
 
     #Copy over config variables
-    robot.write("MOOSTimeWarp = " + timewarp + "\n")
-    robot.write("LatOrigin  = 41.34928" + "\n")
-    robot.write("LongOrigin = -74.063645" + "\n")
-
-    #Copy over community variables
-    robot.write("ServerHost = " + robot_ip + "\n")
-    robot.write("ServerPort = 90" + robot_port_affix + "\n")
-    robot.write("Community = " + robot_name.replace(" ", "_"))
+    set_header_vars(robot, timewarp, 41.34928, -74.063645, robot_ip, robot_port_affix, robot_name)
 
     #Create ANTLER processconfig
     write_processconfig(robot, "ANTLER", {
@@ -439,6 +443,7 @@ for robot_name in robots:
     })
 
     #Create uProcessWatch processconfig
+    '''
     write_processconfig(robot, "uProcessWatch", {
         "AppTick" : [ "2" ],
         "CommsTick" : [ "2" ],
@@ -462,6 +467,7 @@ for robot_name in robots:
 
         "SUMMARY_WAIT" : [ "12" ]
     })
+    '''
 
     #Create pNodeReportParse processconfig
     write_processconfig(robot, "pNodeReportParse", {
@@ -500,7 +506,7 @@ for robot_name in robots:
         "AppTick" : [ "4" ],
         "CommsTick" : [ "4" ],
 
-        "Behaviors": [ robot_name.replace(" ", "_") + ".bhv" ],
+        "Behaviors": [ f"{robot_name}.bhv" ],
         "Verbose": [ "false" ],
         "Domain": [ "course:0:359:360", "speed:0:1.5:26" ]
     })
@@ -519,7 +525,7 @@ for robot_name in robots:
         "AppTick" : [ "2" ],
         "CommsTick" : [ "2" ],
 
-        "input" : [ "route = " + robot_ip + ":93" + robot_port_affix ]
+        "input" : [ f"route = {robot_ip}:93{robot_port_affix}" ]
     })
 
     #Write uFldNodeBroker processconfig
@@ -527,7 +533,7 @@ for robot_name in robots:
         "AppTick" : [ "1" ],
         "CommsTick" : [ "1" ],
 
-        "TRY_SHORE_HOST": [ "pshare_route=" + shoreside_ip + ":93" + shoreside_port_affix ],
+        "TRY_SHORE_HOST": [ f"pshare_route={shoreside_ip}:93{shoreside_port_affix}" ],
 
         "BRIDGE" : [ 
             "src=VIEW_POLYGON", 
@@ -564,8 +570,6 @@ for robot_name in robots:
                             if is_comment_node(trace.nodes[prior_node]):
                                 continue
                             
-                            print(trace.nodes[prior_node])
-
                             for link_in2 in trace.nodes[prior_node].links_in:
                                 if link_in2.link_type == LINK_TYPE.INCLUDES:
                                     prior_node2 = trace.nodes[link_in2.source]
@@ -575,21 +579,19 @@ for robot_name in robots:
 
                                     prior_node3 = trace.nodes[prior_node2.links_in[0].source]
 
-                                    if prior_node3.name == robot_name:
+                                    if prior_node3.name.replace(" ", "_") == robot_name:
                                         var_name = var_node.name.split("  ", 1)[0]
 
                                         if var_name.startswith("set "):
                                             var_name = var_name.split(" ", 1)[1]
+                                        
+                                        var_name = var_name.replace(" ", "_")
 
                                         if var_name.endswith(" "):
-                                            var_name = var_name.replace(" ", "_")
-
-                                            bridge_list.append("src=" + var_name + "X")
-                                            bridge_list.append("src=" + var_name + "Y")
+                                            bridge_list.append(f"src={var_name}X")
+                                            bridge_list.append(f"src={var_name}Y")
                                         else:
-                                            var_name = var_name.replace(" ", "_")
-
-                                            bridge_list.append("src=" + var_name)
+                                            bridge_list.append(f"src={var_name}")
 
     #Removing any duplicate variable assignments
     bridge_list = [*set(bridge_list)]
@@ -603,7 +605,7 @@ for robot_name in robots:
 
     for trace in traces:
         for node in trace.nodes:
-            if trace.nodes[node].name == robot_name:
+            if trace.nodes[node].name.replace(" ", "_") == robot_name:
                 for link in trace.nodes[node].links_out:
                     moos_app = trace.nodes[link.destination].name
 
@@ -616,11 +618,14 @@ for robot_name in robots:
     extra_moos_apps = [*set(extra_moos_apps)]
 
     for moos_app in extra_moos_apps:
-        print(input_dir + robot_name.replace(" ", "_") + "/" + moos_app)
-        if os.path.isfile(input_dir + robot_name.replace(" ", "_") + "/" + moos_app):
-            config_file = open(input_dir + robot_name.replace(" ", "_") + "/" + moos_app)
+        robot_path = jp(input_dir, f"{robot_name}/")
+        moos_app_path = jp(robot_path, moos_app)
 
-            robot.write("\n" + config_file.read() + "\n")
+        if os.path.isfile(moos_app_path):
+            config_file = open(moos_app_path)
+
+            writeline(robot)
+            writeline(robot, config_file.read())
 
     robot.close()
 
@@ -639,7 +644,11 @@ modes = []
 robots = [*set(robots)]
 
 for robot_name in robots:
-    robot = open("output/" + robot_name.replace(" ", "_") + ".bhv", "x")
+    robot_name = robot_name.replace(" ", "_")
+
+    robot_path = jp(output_dir, f"{robot_name}.bhv")
+
+    robot = open(robot_path, "x")
 
     initial_variables = {}
 
@@ -663,9 +672,9 @@ for robot_name in robots:
                             initial_variables[variable] = value
 
     for variable, value in initial_variables.items():
-        robot.write("initialize " + variable + " = " + value + "\n")
+        writeline(robot, f"initialize {variable} = {value}")
     
-    robot.write("\n")
+    writeline(robot)
 
     #Finding the trace with the robot's state machine in it
     for trace in traces:
@@ -722,8 +731,6 @@ for robot_name in robots:
                                         #Found a defined node
                                         new_mode = Mode(undefined_node.name)
 
-                                        print(new_mode.name)
-                                        
                                         transition_text = link_in.text
                                         
                                         variable = transition_text.split("__", 1)[0]
@@ -741,39 +748,39 @@ for robot_name in robots:
                                             if defined_mode.parent_mode == "":
                                                 new_mode.parent_mode = defined_mode.name
                                             else:
-                                                new_mode.parent_mode = defined_mode.parent_mode + ":" + defined_mode.name
+                                                new_mode.parent_mode = f"{defined_mode.parent_mode}:{defined_mode.name}"
                                 
                                 defined_modes.append(new_mode)
                                 defined_mode_names.append(new_mode.name)
 
                 
                 for defined_mode in defined_modes:
-                    robot.write("set MODE = " + defined_mode.name + "{\n")
+                    writeline(robot, f"set MODE = {defined_mode.name}{{")
 
                     for variable, value in defined_mode.condition.items():
-                        robot.write("  " + variable + " = " + value + "\n")
+                        writeline(robot, f"  {variable} = {value}")
                     for variable, value in defined_mode.anticondition.items():
-                        robot.write("  " + variable + " != " + value + "\n")
+                        writeline(robot, f"  {variable} != {value}")
                     
-                    #if defined_mode.parent_mode != "":
-                    #    robot.write("  MODE = " + defined_mode.parent_mode + "\n")
-
-                    robot.write("}\n\n")
+                    writeline(robot, "}")
+                    writeline(robot)
 
                 for defined_mode in defined_modes:
-                    print(input_dir + robot_name.replace(" ", "_") + "/" + defined_mode.name)
-                    if os.path.exists(input_dir + robot_name.replace(" ", "_") + "/" + defined_mode.name):
-                        mode_behaviors = open(input_dir + robot_name.replace(" ", "_") + "/" + defined_mode.name, "r")
+                    behavior_path = jp(robot_path, defined_mode.name)
+
+                    if os.path.exists(behavior_path):
+                        mode_behaviors = open(behavior_path, "r")
 
                         lines = mode_behaviors.readlines()
 
                         for line in lines:
                             if "condition" in line and "=" in line:
-                                robot.write("  condition = MODE==" + defined_mode.name + "\n")
+                                writeline(robot, f"  condition = MODE=={defined_mode.name}")
                             else:
                                 robot.write(line)
 
-                        robot.write("\n\n")
+                        writeline(robot)
+                        writeline(robot)
     
     robot.close()
 
@@ -781,12 +788,14 @@ for robot_name in robots:
 ################################################################################
 
 #Create launch.sh file
-launch = open("output/launch.sh", "w")
+launch_path = jp(output_dir, "launch.sh")
 
-launch.write("pAntler shoreside.moos &\n")
+launch = open("launch_path", "w")
+
+writeline(launch, "pAntler shoreside.moos &>/dev/null")
 
 for robot_name in robots:
-    launch.write("pAntler " + robot_name.replace(" ", "_") + ".moos &\n")
+    writeline(launch, f"pAntler {robot_name.replace(" ", "_")}.moos &>/dev/null")
 
 #Make the launch file executable
-os.chmod(output_dir + "launch.sh", stat.S_IRWXU)
+os.chmod(launch_path, stat.S_IRWXU)
