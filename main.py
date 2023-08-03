@@ -225,6 +225,7 @@ pMarineViewerConfig = {
 index = 1
 for button, button_vars in buttons.items():
     current_button_name = ""
+    '''
     match index:
         case 1:
             current_button_name = "button_one"
@@ -236,6 +237,17 @@ for button, button_vars in buttons.items():
             current_button_name = "button_four"
         case _:
             pass
+    '''
+
+    if index == 1:
+        current_button_name = "button_one"
+    elif index == 2:
+        current_button_name = "button_two"
+    elif index == 3:
+        current_button_name = "button_three"
+    elif index == 4:
+        current_button_name = "button_four"
+
     
     button_string = button
 
@@ -707,7 +719,7 @@ for robot_name in robots:
 
                     variable = transition_text.split("__", 1)[0]
                     value = transition_text.split("__", 1)[1]
-                    
+
                     new_mode = Mode("ALLSTOP")
                     new_mode.condition = { variable : value }
                     unique = True
